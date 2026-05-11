@@ -11,25 +11,29 @@ function autoCropImage(img) {
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0);
   const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-  let top = canvas.height, bottom = 0, left = canvas.width, right = 0;
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      const alpha = data[(y * canvas.width + x) * 4 + 3];
-      if (alpha > 10) {
-        if (y < top)    top    = y;
-        if (y > bottom) bottom = y;
-        if (x < left)   left   = x;
-        if (x > right)  right  = x;
-      }
-    }
+  const W = canvas.width, H = canvas.height;
+  let top = H, bottom = 0, left = W, right = 0;
+
+  // scan each edge inward — faster average case than full nested loop
+  outer: for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) { if (data[(y * W + x) * 4 + 3] > 10) { top = y; break outer; } }
   }
+  outer: for (let y = H - 1; y >= top; y--) {
+    for (let x = 0; x < W; x++) { if (data[(y * W + x) * 4 + 3] > 10) { bottom = y; break outer; } }
+  }
+  outer: for (let x = 0; x < W; x++) {
+    for (let y = top; y <= bottom; y++) { if (data[(y * W + x) * 4 + 3] > 10) { left = x; break outer; } }
+  }
+  outer: for (let x = W - 1; x >= left; x--) {
+    for (let y = top; y <= bottom; y++) { if (data[(y * W + x) * 4 + 3] > 10) { right = x; break outer; } }
+  }
+
   const pad = 8;
   top    = Math.max(0, top - pad);
-  bottom = Math.min(canvas.height - 1, bottom + pad);
+  bottom = Math.min(H - 1, bottom + pad);
   left   = Math.max(0, left - pad);
-  right  = Math.min(canvas.width - 1, right + pad);
-  const w = right - left;
-  const h = bottom - top;
+  right  = Math.min(W - 1, right + pad);
+  const w = right - left, h = bottom - top;
   const out = document.createElement('canvas');
   out.width = w; out.height = h;
   out.getContext('2d').drawImage(canvas, left, top, w, h, 0, 0, w, h);
@@ -43,6 +47,7 @@ function maybeCropHeroImages() {
     else img.addEventListener('load', () => autoCropImage(img), { once: true });
   });
 }
+
 /* ─── WhatsApp ─────────────────────────────────────────────── */
 const WA = "5512981710055";
 const MSG = {
@@ -65,7 +70,6 @@ const revealObserver = new IntersectionObserver((entries) => {
   for (const e of entries) {
     if (e.isIntersecting) {
       e.target.classList.add('is-in');
-      // staggered children
       const kids = e.target.querySelectorAll('[data-stagger]');
       kids.forEach((k, i) => {
         k.style.transitionDelay = `${i * 90}ms`;
@@ -82,8 +86,6 @@ document.querySelectorAll('[data-reveal]').forEach(el => revealObserver.observe(
 function splitWords(el) {
   if (!el || el.dataset.split) return;
   el.dataset.split = '1';
-  const html = el.innerHTML;
-  // Split text nodes only, preserve <strong>/<em>
   const walk = (node) => {
     if (node.nodeType === 3) {
       const frag = document.createDocumentFragment();
@@ -98,10 +100,8 @@ function splitWords(el) {
       });
       node.parentNode.replaceChild(frag, node);
     } else if (node.nodeType === 1) {
-      // Don't descend if it's already a .word
       if (node.classList && node.classList.contains('word')) return;
       Array.from(node.childNodes).forEach(walk);
-      // Also wrap text inside <strong>/<em> as a single word? — keep as block to preserve styles
     }
   };
   walk(el);
@@ -133,14 +133,19 @@ const produtoEl      = document.getElementById('produto');
 const produtoBrownie = document.getElementById('produtoBrownie');
 const etags          = document.querySelectorAll('.etag');
 
-// Tags start near the center brownie and drift OUTWARD a small amount,
-// finishing well inside the viewport edges. They appear early and stay visible
-// for the full sticky scroll — never fly off-screen.
+// Tags drift outward during sticky scroll — constrained so they never leave the viewport
 const tagTargets = {
   size:  { x: -10, y: -10, delay: 0    },
   fill:  { x:  10, y: -10, delay: 0.08 },
   thick: { x: -10, y:  10, delay: 0.04 },
   made:  { x:  10, y:  10, delay: 0.12 },
+};
+
+const tagTargetsMobile = {
+  size:  { x: -6, y: -8, delay: 0    },
+  fill:  { x:  6, y: -8, delay: 0.08 },
+  thick: { x: -6, y:  8, delay: 0.04 },
+  made:  { x:  6, y:  8, delay: 0.12 },
 };
 
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -150,7 +155,7 @@ function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
 /* ─── 5. Topbar shrink on scroll ──────────────────────────── */
 const topbar = document.querySelector('.topbar');
 
-/* ─── 6. Smooth follow / scroll handler ───────────────────── */
+/* ─── 6. Scroll handler ────────────────────────────────────── */
 let ticking = false;
 function onScroll() {
   if (ticking) return;
@@ -158,40 +163,28 @@ function onScroll() {
   requestAnimationFrame(() => {
     const scrollY = window.scrollY;
 
-    // Topbar
     if (topbar) topbar.classList.toggle('is-scrolled', scrollY > 30);
 
-    // Hero parallax
     if (heroBrownie && heroSection) {
       const h = heroSection.offsetHeight;
       const p = clamp(scrollY / h, 0, 1);
-      const dy = -p * 80;
-      const sc = 1 - p * 0.06;
-      const rot = p * 4;
-      heroBrownie.style.setProperty('--scroll-y', `${dy}px`);
-      heroBrownie.style.setProperty('--scroll-s', sc);
-      heroBrownie.style.setProperty('--scroll-r', `${rot}deg`);
-
-      // Copy fades up + away as scroll increases
+      heroBrownie.style.setProperty('--scroll-y', `${-p * 80}px`);
+      heroBrownie.style.setProperty('--scroll-s', 1 - p * 0.06);
+      heroBrownie.style.setProperty('--scroll-r', `${p * 4}deg`);
       if (heroCopy) {
         heroCopy.style.opacity = 1 - p * 0.4;
         heroCopy.style.transform = `translateY(${-p * 30}px)`;
       }
-      // Tags drift
       heroTags.forEach((t, i) => {
         const dir = i === 0 ? -1 : 1;
         t.style.transform = `translate(${dir * p * 30}px, ${-p * 20}px)`;
       });
     }
 
-    // Exploding object
     if (produtoEl) {
       const rect    = produtoEl.getBoundingClientRect();
       const total   = produtoEl.offsetHeight - window.innerHeight;
-      const scrolled = -rect.top;
-      const raw     = clamp(scrolled / total, 0, 1);
-      const p       = easeOut(raw);
-
+      const p       = easeOut(clamp(-rect.top / total, 0, 1));
       const isMobile = window.innerWidth < 900;
 
       if (produtoBrownie) {
@@ -200,30 +193,20 @@ function onScroll() {
         produtoBrownie.style.transform = `scale(${sc}) rotate(${rot}deg)`;
       }
 
-      // Tags: drift menor no mobile para não sair da tela
-      const tagTargetsMobile = {
-        size:  { x: -6, y: -8, delay: 0    },
-        fill:  { x:  6, y: -8, delay: 0.08 },
-        thick: { x: -6, y:  8, delay: 0.04 },
-        made:  { x:  6, y:  8, delay: 0.12 },
-      };
       const targets = isMobile ? tagTargetsMobile : tagTargets;
-
       etags.forEach(tag => {
-        const id  = tag.dataset.id;
-        const tgt = targets[id];
+        const tgt = targets[tag.dataset.id];
         if (!tgt) return;
         const localP = easeOut(clamp((p - tgt.delay) / 0.45, 0, 1));
-        const x = lerp(0, tgt.x, localP);
-        const y = lerp(0, tgt.y, localP);
-        tag.style.transform = `translate(${x}vw, ${y}vh)`;
+        tag.style.transform = `translate(${lerp(0, tgt.x, localP)}vw, ${lerp(0, tgt.y, localP)}vh)`;
         tag.style.opacity   = clamp(localP * 1.6, 0, 1);
         const line = tag.querySelector('.etag-line');
         if (line) line.style.width = `${localP * 3}rem`;
       });
     }
+
+    ticking = false;
   });
-  ticking = false;
 }
 
 window.addEventListener('scroll', onScroll, { passive: true });
@@ -234,10 +217,8 @@ onScroll();
 document.querySelectorAll('.sabor').forEach(card => {
   card.addEventListener('pointermove', (e) => {
     const r = card.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 100;
-    const y = ((e.clientY - r.top) / r.height) * 100;
-    card.style.setProperty('--mx', `${x}%`);
-    card.style.setProperty('--my', `${y}%`);
+    card.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+    card.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
   });
 });
 
@@ -245,13 +226,9 @@ document.querySelectorAll('.sabor').forEach(card => {
 document.querySelectorAll('[data-magnetic]').forEach(btn => {
   btn.addEventListener('pointermove', (e) => {
     const r = btn.getBoundingClientRect();
-    const x = e.clientX - r.left - r.width / 2;
-    const y = e.clientY - r.top - r.height / 2;
-    btn.style.transform = `translate(${x * 0.15}px, ${y * 0.2}px)`;
+    btn.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * 0.15}px, ${(e.clientY - r.top - r.height / 2) * 0.2}px)`;
   });
-  btn.addEventListener('pointerleave', () => {
-    btn.style.transform = '';
-  });
+  btn.addEventListener('pointerleave', () => { btn.style.transform = ''; });
 });
 
 /* ─── 9. Counter animation (CTA-final stats) ──────────────── */
@@ -262,12 +239,10 @@ const counterObserver = new IntersectionObserver((entries) => {
     const target = parseFloat(el.dataset.counter);
     const dur = 1400;
     const t0 = performance.now();
-    const startVal = 0;
     const isFloat = String(target).includes('.');
     const tick = (t) => {
       const p = clamp((t - t0) / dur, 0, 1);
-      const eased = 1 - Math.pow(1 - p, 3);
-      const val = startVal + (target - startVal) * eased;
+      const val = target * easeOut(p);
       el.textContent = isFloat ? val.toFixed(1) : Math.round(val).toLocaleString('pt-BR');
       if (p < 1) requestAnimationFrame(tick);
     };
@@ -277,10 +252,7 @@ const counterObserver = new IntersectionObserver((entries) => {
 }, { threshold: 0.5 });
 document.querySelectorAll('[data-counter]').forEach(el => counterObserver.observe(el));
 
-/* ─── 10. Marquee for "produto" decorative band ───────────── */
-// (CSS-only marquee — nothing here)
-
-/* ─── 11. Hero carousel ───────────────────────────────────── */
+/* ─── 10. Hero carousel ────────────────────────────────────── */
 function initHeroCarousel() {
   const carousel = document.querySelector('.hero-carousel');
   const track    = document.querySelector('.hero-carousel-track');
@@ -293,17 +265,34 @@ function initHeroCarousel() {
 
   const N = slides.length;
   let current = 0;
-  let startX = 0, startY = 0, dragging = false, dragDx = 0;
+  let startX = 0, startY = 0, dragDx = 0;
+  let cachedWidth = carousel.getBoundingClientRect().width;
 
-  // slideWidth em px reais do carousel
-  function sw() { return carousel.getBoundingClientRect().width; }
+  window.addEventListener('resize', () => {
+    cachedWidth = carousel.getBoundingClientRect().width;
+    setPos(0, false);
+  });
 
   function setPos(extraPx, animated) {
-    // cada slide ocupa sw() px; track tem width = N * sw()
-    // posição base = -current * sw(); extraPx = offset do drag
-    const base = -current * sw();
-    track.style.transition = animated ? 'transform .45s cubic-bezier(.4,0,.2,1)' : 'none';
-    track.style.transform  = `translateX(${base + extraPx}px)`;
+    track.style.transition = animated ? 'transform .6s cubic-bezier(.25,1,.35,1)' : 'none';
+    track.style.transform  = `translateX(${-current * cachedWidth + extraPx}px)`;
+  }
+
+  function applyWordStyle(el, transition, opacity, translateY) {
+    el.style.transition = transition;
+    el.style.opacity    = opacity;
+    el.style.transform  = `translateY(${translateY})`;
+  }
+
+  function finishDrag(dy) {
+    if (dy !== undefined && (Math.abs(dragDx) < Math.abs(dy) || Math.abs(dragDx) < 40)) {
+      setPos(0, true); return;
+    }
+    if (Math.abs(dragDx) > 40) {
+      goTo(dragDx < 0 ? current + 1 : current - 1);
+    } else {
+      setPos(0, true);
+    }
   }
 
   function goTo(idx) {
@@ -313,28 +302,18 @@ function initHeroCarousel() {
     dots.forEach((d, i) => d.classList.toggle('active', i === current));
 
     const slide = slides[current];
-    const headline = slide.dataset.headline || '';
-    const sub      = slide.dataset.sub      || '';
-    const wa       = slide.dataset.wa       || 'default';
+    const wa = slide.dataset.wa || 'default';
 
     if (w1) {
-      const out = 'opacity .22s ease, transform .22s ease';
-      const inn = 'opacity .38s ease, transform .38s ease';
-      w1.style.transition = out;
-      w2.style.transition = out;
-      w1.style.opacity = '0';
-      w2.style.opacity = '0';
-      w1.style.transform = 'translateY(-10px)';
-      w2.style.transform = 'translateY(-8px)';
+      const tOut = 'opacity .22s ease, transform .22s ease';
+      const tIn  = 'opacity .38s ease, transform .38s ease';
+      applyWordStyle(w1, tOut, '0', '-10px');
+      applyWordStyle(w2, tOut, '0', '-8px');
       setTimeout(() => {
-        w1.textContent = headline;
-        w2.innerHTML = sub.replace('&amp;', '<span class="ampersand">&amp;</span>');
-        w1.style.transition = inn;
-        w2.style.transition = inn;
-        w1.style.opacity = '1';
-        w2.style.opacity = '1';
-        w1.style.transform = 'translateY(0)';
-        w2.style.transform = 'translateY(0)';
+        w1.textContent = slide.dataset.headline || '';
+        w2.innerHTML = (slide.dataset.sub || '').replace('&amp;', '<span class="ampersand">&amp;</span>');
+        applyWordStyle(w1, tIn, '1', '0');
+        applyWordStyle(w2, tIn, '1', '0');
       }, 230);
     }
     if (ctaBtn) ctaBtn.onclick = () => openWhatsApp(wa);
@@ -342,37 +321,28 @@ function initHeroCarousel() {
 
   // Touch
   carousel.addEventListener('touchstart', e => {
-    startX   = e.touches[0].clientX;
-    startY   = e.touches[0].clientY;
-    dragging = true;
-    dragDx   = 0;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dragDx = 0;
     setPos(0, false);
   }, { passive: true });
 
   carousel.addEventListener('touchmove', e => {
-    if (!dragging) return;
     dragDx = e.touches[0].clientX - startX;
     setPos(dragDx, false);
   }, { passive: true });
 
   carousel.addEventListener('touchend', e => {
-    if (!dragging) return;
-    dragging = false;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dragDx) < Math.abs(dy) || Math.abs(dragDx) < 40) {
-      setPos(0, true);
-      return;
-    }
-    goTo(dragDx < 0 ? current + 1 : current - 1);
+    finishDrag(e.changedTouches[0].clientY - startY);
   }, { passive: true });
 
-  // Mouse drag (desktop)
+  // Mouse
   let mouseActive = false;
   carousel.addEventListener('mousedown', e => {
     if (e.target.closest('.hc-arrow')) return;
     mouseActive = true;
-    startX  = e.clientX;
-    dragDx  = 0;
+    startX = e.clientX;
+    dragDx = 0;
     carousel.classList.add('is-dragging');
     setPos(0, false);
     e.preventDefault();
@@ -388,20 +358,14 @@ function initHeroCarousel() {
     if (!mouseActive) return;
     mouseActive = false;
     carousel.classList.remove('is-dragging');
-    if (Math.abs(dragDx) > 40) {
-      goTo(dragDx < 0 ? current + 1 : current - 1);
-    } else {
-      setPos(0, true);
-    }
+    finishDrag();
     dragDx = 0;
   });
 
-  // Setas
   const prevBtn = carousel.querySelector('.hc-arrow-prev');
   const nextBtn = carousel.querySelector('.hc-arrow-next');
   if (prevBtn) prevBtn.addEventListener('click', () => goTo(current - 1));
   if (nextBtn) nextBtn.addEventListener('click', () => goTo(current + 1));
-
   dots.forEach((dot, i) => dot.addEventListener('click', () => goTo(i)));
 
   if (window.innerWidth <= 900) maybeCropHeroImages();

@@ -1428,7 +1428,7 @@ footer {
     height: 100svh;
     min-height: 100svh;
     display: grid;
-    grid-template-rows: 68svh 32svh;
+    grid-template-rows: 64svh 36svh;
     overflow: hidden;
     position: relative;
   }
@@ -1437,19 +1437,19 @@ footer {
     grid-row: 1 / 3;
     grid-column: 1;
     display: grid;
-    grid-template-rows: 68svh 32svh;
+    grid-template-rows: 64svh 36svh;
     padding: 0;
     gap: 0;
     align-items: stretch;
   }
 
-  /* Linha 1: brownie centralizado, ocupa 68svh */
+  /* Linha 1: brownie centralizado, ocupa 64svh */
   .hero-brownie {
     order: -1;
     grid-row: 1;
     width: 100vw;
     max-width: 100vw;
-    height: 68svh;
+    height: 64svh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1463,7 +1463,7 @@ footer {
     width: auto;
     max-width: 82vw;
     height: auto;
-    max-height: 58svh;
+    max-height: 54svh;
     transform: none;
     filter: drop-shadow(0 28px 56px rgba(140,81,46,.85))
             drop-shadow(0 10px 22px rgba(0,0,0,.75));
@@ -1476,8 +1476,8 @@ footer {
     grid-row: 2;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
-    padding: 1.6rem 1.8rem 2rem;
+    justify-content: center;
+    padding: 1.2rem 1.8rem 1.4rem;
     background: rgba(26,26,14,1);
     position: relative;
     z-index: 3;
@@ -1500,22 +1500,23 @@ footer {
   .hero-sub   { display: none; }
   .hero-specs { display: none; }
 
-  .hero-headline { margin-bottom: .6rem; line-height: .92; }
-  .hero-headline .w1 { font-size: clamp(3rem, 15vw, 4.5rem); }
-  .hero-headline .w2 { font-size: clamp(1rem, 4.2vw, 1.5rem); margin-top: .08em; color: rgba(242,227,196,.7); }
+  .hero-headline { margin-bottom: .75rem; line-height: 1; }
+  .hero-headline .w1 { font-size: clamp(2.8rem, 14vw, 4.2rem); line-height: .92; }
+  .hero-headline .w2 { font-size: clamp(1rem, 4.2vw, 1.4rem); margin-top: .35em; color: rgba(242,227,196,.7); line-height: 1.2; }
 
   .hero-actions {
-    margin-top: 1.1rem;
-    gap: .8rem;
+    margin-top: 1.2rem;
+    gap: .75rem;
     flex-wrap: nowrap;
     align-items: center;
   }
   .hero-actions .btn-wa.lg {
     flex: 1;
     justify-content: center;
-    padding: 1rem 1.2rem;
-    font-size: .88rem;
+    padding: .85rem 1rem;
+    font-size: .85rem;
     letter-spacing: .04em;
+    white-space: nowrap;
   }
   .hero-actions .btn-ghost {
     white-space: nowrap;
@@ -1534,7 +1535,7 @@ footer {
   .hc-slide img {
     width: auto;
     max-width: 72vw;
-    max-height: 52svh;
+    max-height: 48svh;
     height: auto;
     filter: drop-shadow(0 28px 56px rgba(140,81,46,.85))
             drop-shadow(0 10px 22px rgba(0,0,0,.75));
