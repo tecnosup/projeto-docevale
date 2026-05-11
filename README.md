@@ -80,7 +80,7 @@ Uma única landing page com **7 seções verticais** (mais topbar fixa).
 - Esquerda: eyebrow "I · Manifesto" + roman `i.` 3.4rem Playfair italic 700 em `--brownie-2`
 - Direita: parágrafo Playfair italic, cream 85%, com `<strong>` em 900 cream sólido e `<em>` em `--brownie-2`
 - Animação: **word-by-word reveal** via JS — palavras envolvidas em `.word` aparecem em sequência (delay 35ms × idx, transição 0.65s)
-- Assinatura: "— Daiane · que faz cada um à mão · Cruzeiro/SP" (uppercase, letter-spacing 0.22em)
+- Assinatura: "— João · que faz cada um à mão · Cruzeiro/SP" (uppercase, letter-spacing 0.22em)
 
 ### 4. Marquee
 - Banda decorativa, bg `--dark`, hairlines top+bottom

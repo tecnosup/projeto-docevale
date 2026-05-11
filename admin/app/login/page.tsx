@@ -55,7 +55,7 @@ export default function LoginPage() {
               required
               autoComplete="email"
               className="w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3.5 py-2.5 text-sm text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
-              placeholder="daiane@docevale.com"
+              placeholder="joao@docevale.com"
             />
           </div>
 
